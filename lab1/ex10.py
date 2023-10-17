@@ -1,4 +1,6 @@
-text_example = "I have Python exam"
+import re
+
+text_example = "I have         Python exam"
 
 
 def count_words(text):
@@ -7,7 +9,8 @@ def count_words(text):
     :param text:
     :return:
     """
-    return len(text.split(" "))
-
+    # return len(text.split(" "))
+    return len(re.split("\s+", text))
+    # return re.split("\s+", text)
 
 print(count_words(text_example))
