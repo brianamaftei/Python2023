@@ -109,7 +109,7 @@ if __name__ == '__main__':
     # print(compare_dictionary({("abc", frozenset({"a", 34, frozenset({2, 3})})): [1, 2, 3]}, {5: (3, 4)}))
     # print(compare_dictionary({("abc", frozenset({"a", 34, frozenset({2, 3})})): [1, 2, 3], 5: 3},
     #                          {5: 3, ("abc", frozenset({"a", 34, frozenset({3, 2})})): [1, 2, 3]}))
-    print(recursive_values({("abc", frozenset({"a", 34, frozenset({2, 3})})): [1, 2, 3], 5: 3},
+    print(recursive_values({("abc", frozenset({"a":7, 34:9, 7:{2, 3}})): [1, 2, 3], 5: 3},
                            {5: 3, ("abc", frozenset({"a", 34, frozenset({3, 2})})): [1, 2, 3]}))
     print(recursive_values({("abc", frozenset({"a", 34, frozenset({2, 3})})): [1, 2, 3]}, {5: (3, 4)}))
     print(recursive_values({"a": (3, 4), "b": {1: "5"}}, {"a": (3, 4), "b": {1: "6"}}))
