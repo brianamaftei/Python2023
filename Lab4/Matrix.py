@@ -49,12 +49,6 @@ class Matrix:
 
 transform = lambda string: string[-1] in "02468"
 
-
-def zip_of_lists(*lists):
-    max_length = max([len(lst) for lst in lists])
-    return list(map(list, zip(*list(lst + [None] * (max_length - len(lst)) for lst in lists))))
-
-
 matrix1 = Matrix(4, 3)
 matrix1.set(0, 0, "0")
 matrix1.set(0, 1, "1")
