@@ -41,13 +41,13 @@ class Matrix:
                 for k in range(self.M):
                     el1 = self.matrix[i][k]
                     el2 = matrix.matrix[k][j]
-                    if type(el1) is not int or type(el2) is not int:
+                    if type(el1) not in (int, float, complex) or type(el2) not in (int, float, complex):
                         return None
                     new_matrix.matrix[i][j] += self.matrix[i][k] * matrix.matrix[k][j]
         return new_matrix.matrix
 
 
-transform = lambda string: string[-1] in "2468"
+transform = lambda string: string[-1] in "02468"
 
 
 def zip_of_lists(*lists):
@@ -93,7 +93,7 @@ matrix3.set(1, 0, 3)
 matrix3.set(1, 1, 4)
 matrix3.set(1, 2, 5)
 matrix3.set(2, 0, 6)
-matrix3.set(2, 1, 7)
+matrix3.set(2, 1, 7j)
 matrix3.set(2, 2, 8)
 matrix3.set(3, 0, 9)
 matrix3.set(3, 1, 10)
