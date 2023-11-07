@@ -22,7 +22,9 @@ class Matrix:
         return transpose_matrix.matrix
 
     def transpose_1(self):
-        return zip_of_lists(*self.matrix)
+        lists = self.matrix
+        max_length = max([len(lst) for lst in lists])
+        return list(map(list, zip(*list(lst + [None] * (max_length - len(lst)) for lst in lists))))
 
     def modify_all(self, lambda_function):
         new_matrix = Matrix(self.N, self.M)
