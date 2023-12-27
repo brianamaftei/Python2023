@@ -30,21 +30,30 @@ class Zip:
     def status_files(self, location_number, location_current_files):
         try:
             with zipfile.ZipFile(self.path) as z:
+                for file in location_current_files:
+                    if file not in z.namelist():
+                        location_current_files[file] = (location_current_files[file][0], "deleted", location_number)
+                    else:
+                        location_current_files[file][1] = (
+                            location_current_files[file][0], "unchanged", location_current_files[file][2])
+
                 for i in z.infolist():
                     name = os.path.basename(i.filename)
                     data_modified = datetime(*i.date_time)
                     if name not in location_current_files:
-                        location_current_files[name] = (
-                            File(path=i.filename, name=name, data_modified=data_modified, parent=self.path),
-                            "added", location_number)
-                    else:
-                        if location_current_files[name].data_modified > data_modified:
+                        if name not in location_current_files:
+                            location_current_files[name] = (
+                                File(path=i.filename, name=name, data_modified=data_modified, parent=self.path),
+                                "added", location_number)
+                        elif location_current_files[name].data_modified < data_modified:
                             location_current_files[name] = (
                                 File(path=i.filename, name=name, data_modified=data_modified, parent=self.path),
                                 "modified", location_number)
-                for file in location_current_files:
-                    if file not in z.namelist():
-                        location_current_files[file] = (location_current_files[file][0], "deleted", location_number)
+                    elif location_current_files[name].data_modified < data_modified:
+                        location_current_files[name] = (
+                            File(path=i.filename, name=name, data_modified=data_modified, parent=self.path),
+                            "modified", location_number)
+
         except zipfile.BadZipFile as e:
             print(type(e), str(e))
             sys.exit(1)

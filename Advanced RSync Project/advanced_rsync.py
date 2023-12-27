@@ -33,21 +33,25 @@ class Sync:
         self.location_1 = parse_location(arg1)
         self.location_2 = parse_location(arg2)
         self.location_1_2_files = {}
-        self.location_1_modification = {}
-        self.location_2_modification = {}
+        self.differences = {}
 
     def start(self):
         print("First Location: " + self.location_1.__str__())
         print("Second Location: " + self.location_2.__str__())
         self.location_1.print_files()
         self.location_2.print_files()
-        self.search_differences()
+        self.check_differences()
+        self.update_location_1_2()
 
-    def search_differences(self):
-        self.location_1.status_files(1, self.location_1_modification, self.location_1_2_files)
-        self.location_2.status_files(2, self.location_2_modification, self.location_1_2_files)
+    def check_differences(self):
+        self.location_1.status_files(1, self.differences, self.location_1_2_files)
+        self.location_2.status_files(2, self.differences, self.location_1_2_files)
 
-
+    def update_location_1_2(self):
+        self.location_1_2_files.clear()
+        self.location_1_2_files.update(self.differences)
+        self.differences.clear()
+                
 def main():
     if len(sys.argv) != 3:
         print("Sunt necesare 3 argumente: advanced_rsync.py <location_1> <location_2>!")
