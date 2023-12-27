@@ -23,17 +23,29 @@ def parse_location(location):
         sys.exit(1)
 
 
+def print_dictionary(dictionary):
+    for key in dictionary:
+        print("Key: " + key + " Value: " + dictionary[key].__str__())
+
+
 class Sync:
     def __init__(self, arg1, arg2):
         self.location_1 = parse_location(arg1)
         self.location_2 = parse_location(arg2)
+        self.location_1_2_files = {}
+        self.location_1_modification = {}
+        self.location_2_modification = {}
 
     def start(self):
         print("First Location: " + self.location_1.__str__())
         print("Second Location: " + self.location_2.__str__())
         self.location_1.print_files()
         self.location_2.print_files()
+        self.search_differences()
 
+    def search_differences(self):
+        self.location_1.status_files(1, self.location_1_modification, self.location_1_2_files)
+        self.location_2.status_files(2, self.location_2_modification, self.location_1_2_files)
 
 
 def main():

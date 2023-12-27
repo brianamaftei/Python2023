@@ -1,5 +1,8 @@
 import os
 import sys
+from datetime import datetime
+
+from File import File
 
 
 class Folder:
@@ -21,6 +24,31 @@ class Folder:
         for file in list_of_files:
             print(file)
         print()
+
+    def status_files(self, location_number, location_current_files, location_1_2_files):
+        try:
+            location_current_files.clear()
+            list_of_files = os.listdir(self.path)
+            for file in list_of_files:
+                path = file
+                data_modified = datetime.fromtimestamp(os.path.getmtime(os.path.join(self.path, file)))
+                if file not in location_1_2_files:
+                    location_current_files[file] = (
+                        File(path=path, name=file, data_modified=data_modified, parent=self.path),
+                        "added", location_number)
+                else:
+                    if location_1_2_files[file].data_modified > data_modified:
+                        location_current_files[file] = (
+                            File(path=path, name=file, data_modified=data_modified, parent=self.path),
+                            "modified", location_number)
+
+            for file in location_1_2_files:
+                if file not in list_of_files:
+                    location_current_files[file] = (location_1_2_files[file][0],
+                                                    "deleted", location_number)
+        except OSError as e:
+            print(type(e), str(e))
+            sys.exit(1)
 
     def __str__(self):
         return "Folder: " + self.path
