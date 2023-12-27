@@ -42,6 +42,10 @@ class Sync:
         self.location_2.print_files()
         self.check_differences()
         self.update_location_1_2()
+        print("Differences:")
+        print_dictionary(self.location_1_2_files)
+        print("Differences:")
+        print_dictionary(self.differences)
 
     def check_differences(self):
         self.location_1.status_files(1, self.differences, self.location_1_2_files)
@@ -51,7 +55,8 @@ class Sync:
         self.location_1_2_files.clear()
         self.location_1_2_files.update(self.differences)
         self.differences.clear()
-                
+
+
 def main():
     if len(sys.argv) != 3:
         print("Sunt necesare 3 argumente: advanced_rsync.py <location_1> <location_2>!")

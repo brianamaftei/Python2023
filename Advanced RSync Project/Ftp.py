@@ -67,11 +67,11 @@ class Ftp:
                         location_current_files[name] = (
                             File(path=file, name=name, data_modified=conversion_time, parent=self.location),
                             "added", location_number)
-                    elif location_current_files[name].data_modified < conversion_time:
+                    elif location_current_files[name][0].data_modified < conversion_time:
                         location_current_files[name] = (
                             File(path=file, name=name, data_modified=conversion_time, parent=self.location),
                             "modified", location_number)
-                elif location_1_2_files[name].data_modified < conversion_time:
+                elif location_1_2_files[name][0].data_modified < conversion_time:
                     location_current_files[name] = (
                         File(path=file, name=name, data_modified=conversion_time, parent=self.location),
                         "modified", location_number)

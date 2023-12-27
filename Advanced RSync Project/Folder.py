@@ -31,8 +31,7 @@ class Folder:
 
             for file in location_1_2_files:
                 if file not in list_of_files:
-                    location_current_files[file] = (location_1_2_files[file][0],
-                                                    "deleted", location_number)
+                    location_current_files[file] = (location_1_2_files[file][0], "deleted", location_number)
                 else:
                     location_current_files[file][1] = (
                         location_1_2_files[file][0], "unchanged", location_1_2_files[file][2])
@@ -46,11 +45,11 @@ class Folder:
                             File(path=path, name=file, data_modified=data_modified, parent=self.path),
                             "added", location_number)
                     else:
-                        if location_current_files[file].data_modified < data_modified:
+                        if location_current_files[file][0].data_modified < data_modified:
                             location_current_files[file] = (
                                 File(path=path, name=file, data_modified=data_modified, parent=self.path),
                                 "modified", location_number)
-                elif location_1_2_files[file].data_modified < data_modified:
+                elif location_1_2_files[file][0].data_modified < data_modified:
                     location_current_files[file] = (
                         File(path=path, name=file, data_modified=data_modified, parent=self.path),
                         "modified", location_number)

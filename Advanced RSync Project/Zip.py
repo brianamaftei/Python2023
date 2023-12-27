@@ -45,11 +45,11 @@ class Zip:
                             location_current_files[name] = (
                                 File(path=i.filename, name=name, data_modified=data_modified, parent=self.path),
                                 "added", location_number)
-                        elif location_current_files[name].data_modified < data_modified:
+                        elif location_current_files[name][0].data_modified < data_modified:
                             location_current_files[name] = (
                                 File(path=i.filename, name=name, data_modified=data_modified, parent=self.path),
                                 "modified", location_number)
-                    elif location_current_files[name].data_modified < data_modified:
+                    elif location_current_files[name][0].data_modified < data_modified:
                         location_current_files[name] = (
                             File(path=i.filename, name=name, data_modified=data_modified, parent=self.path),
                             "modified", location_number)
