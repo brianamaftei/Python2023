@@ -13,7 +13,7 @@ class Zip:
     def verify_path(self):
         try:
             if not os.path.exists(self.path):
-                raise FileNotFoundError("Path does not exist")
+                raise FileNotFoundError("Path for zip does not exist")
             if not os.path.isfile(self.path) or not self.path.endswith(".zip"):
                 raise ValueError("Invalid zip location")
             print("Zipfile exists")
@@ -27,20 +27,20 @@ class Zip:
             print(type(e), str(e))
             sys.exit(1)
 
-    def status_files(self, location_number, location_current_files):
+    def status_files(self, location_number, location_current_files, location_1_2_files):
         try:
             with zipfile.ZipFile(self.path) as z:
-                for file in location_current_files:
+                for file in location_1_2_files:
                     if file not in z.namelist():
                         location_current_files[file] = (location_current_files[file][0], "deleted", location_number)
                     else:
                         location_current_files[file][1] = (
-                            location_current_files[file][0], "unchanged", location_current_files[file][2])
+                            location_1_2_files[file][0], "unchanged", location_current_files[file][2])
 
                 for i in z.infolist():
                     name = os.path.basename(i.filename)
                     data_modified = datetime(*i.date_time)
-                    if name not in location_current_files:
+                    if name not in location_1_2_files:
                         if name not in location_current_files:
                             location_current_files[name] = (
                                 File(path=i.filename, name=name, data_modified=data_modified, parent=self.path),
@@ -49,7 +49,11 @@ class Zip:
                             location_current_files[name] = (
                                 File(path=i.filename, name=name, data_modified=data_modified, parent=self.path),
                                 "modified", location_number)
-                    elif location_current_files[name][0].data_modified < data_modified:
+                        elif location_current_files[name][0].data_modified == data_modified:
+                            location_current_files[name] = (
+                                File(path=i.filename, name=name, data_modified=data_modified, parent=self.path),
+                                "unchanged", location_number)
+                    elif location_1_2_files[name][0].data_modified < data_modified:
                         location_current_files[name] = (
                             File(path=i.filename, name=name, data_modified=data_modified, parent=self.path),
                             "modified", location_number)

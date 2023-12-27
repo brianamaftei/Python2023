@@ -1,7 +1,7 @@
 import os
+import shutil
 import sys
 from datetime import datetime
-
 from File import File
 
 
@@ -49,14 +49,21 @@ class Folder:
                             location_current_files[file] = (
                                 File(path=path, name=file, data_modified=data_modified, parent=self.path),
                                 "modified", location_number)
+                        elif location_current_files[file][0].data_modified == data_modified:
+                            location_current_files[file] = (
+                                File(path=path, name=file, data_modified=data_modified, parent=self.path),
+                                "unchanged", location_number)
+
                 elif location_1_2_files[file][0].data_modified < data_modified:
                     location_current_files[file] = (
                         File(path=path, name=file, data_modified=data_modified, parent=self.path),
                         "modified", location_number)
 
         except OSError as e:
-            print(type(e), str(e))
+            print("Error at checking the differences in folder",type(e), str(e))
             sys.exit(1)
+
+
 
     def __str__(self):
         return "Folder: " + self.path
