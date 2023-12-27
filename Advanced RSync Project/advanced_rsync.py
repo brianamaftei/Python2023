@@ -7,7 +7,7 @@ from Zip import Zip
 def parse_location(location):
     try:
         if location.count(":") < 1:
-            raise ValueError("Invalid location format")
+            raise ValueError("Invalid location type")
         type_location = location.split(":", 1)[0]
         location_path = location.split(":", 1)[1]
         if type_location == "ftp":
@@ -17,7 +17,7 @@ def parse_location(location):
         elif type_location == "folder":
             return Folder(location_path)
         else:
-            raise ValueError("Invalid location format")
+            raise ValueError("Invalid location type")
     except ValueError as e:
         print(type(e), str(e))
         sys.exit(1)
@@ -29,8 +29,11 @@ class Sync:
         self.location_2 = parse_location(arg2)
 
     def start(self):
-        print(self.location_1)
-        print(self.location_2)
+        print("First Location: " + self.location_1.__str__())
+        print("Second Location: " + self.location_2.__str__())
+        self.location_1.print_files()
+        self.location_2.print_files()
+
 
 
 def main():
@@ -38,6 +41,7 @@ def main():
         print("Sunt necesare 3 argumente: advanced_rsync.py <location_1> <location_2>!")
         sys.exit(1)
 
+    print(sys.argv[1], sys.argv[2])
     sync = Sync(sys.argv[1], sys.argv[2])
     sync.start()
 

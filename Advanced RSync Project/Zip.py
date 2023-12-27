@@ -1,5 +1,6 @@
 import os
 import sys
+import zipfile
 
 
 class Zip:
@@ -17,3 +18,12 @@ class Zip:
         except (FileNotFoundError, ValueError) as e:
             print(type(e), str(e))
             sys.exit(1)
+
+    def print_files(self):
+        with zipfile.ZipFile(self.path) as z:
+            for i in z.infolist():
+                file_name = os.path.basename(i.filename)
+                print(file_name, end="\n")
+
+    def __str__(self):
+        return "Zip: " + self.path
