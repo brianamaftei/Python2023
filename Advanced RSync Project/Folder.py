@@ -15,7 +15,7 @@ class Folder(File):
         try:
             if not os.path.isdir(self.path):
                 raise OSError("The folder path is not valid")
-            print("Folder exists")
+            print(f"Folder {self.name} exists")
         except OSError as e:
             print(type(e), str(e))
             sys.exit(1)
@@ -25,9 +25,6 @@ class Folder(File):
         for file in list_of_files:
             print(file)
         print()
-
-    def get_location(self):
-        return self.path
 
     def __str__(self):
         return "Folder: " + self.path
