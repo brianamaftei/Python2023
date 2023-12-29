@@ -9,12 +9,11 @@ class Folder(File):
     def __init__(self, name, data_modified, real_parent, temporary_parent=None):
         super().__init__(name, data_modified, real_parent, temporary_parent)
         self.path = self.get_abs_real_path()
-        self.verify_path()
 
     def verify_path(self):
         try:
             if not os.path.isdir(self.path):
-                raise OSError("The folder path is not valid")
+                raise OSError(f"The folder path {self.path} is not valid")
             print(f"Folder {self.name} exists")
         except OSError as e:
             print(type(e), str(e))

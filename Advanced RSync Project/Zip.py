@@ -7,7 +7,6 @@ class Zip(File):
     def __init__(self, name, data_modified, real_parent, temporary_parent=None):
         super().__init__(name, data_modified, real_parent, temporary_parent)
         self.path = self.get_abs_real_path()
-        self.verify_path()
 
     def verify_path(self):
         try:

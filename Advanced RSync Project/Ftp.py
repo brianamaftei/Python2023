@@ -47,43 +47,7 @@ class Ftp:
             logging.error(f"FTP connection error: {e}")
             sys.exit(1)
 
-    def status_files(self, location_number, location_current_files, location_1_2_files):
-        try:
-            list_of_files = self.connection.nlst()
-            for file in location_1_2_files:
-                name = file.split("/")[-1]
-                if file not in list_of_files:
-                    location_current_files[name] = (location_1_2_files[file][0], "deleted", location_number)
-                else:
-                    location_current_files[name][1] = (
-                        location_1_2_files[file][0], "unchanged", location_1_2_files[file][2])
 
-            for file in list_of_files:
-                name = file.split("/")[-1]
-                time_str = self.connection.voidcmd(f'MDTM {file}')[4:]  # returns 3 numbers and a space then the date
-                conversion_time = datetime.strptime(time_str[:14], '%Y%m%d%H%M%S')
-                if name not in location_1_2_files:
-                    if name not in location_current_files:
-                        location_current_files[name] = (
-                            File(path=file, name=name, data_modified=conversion_time, parent=self.location),
-                            "added", location_number)
-                    elif location_current_files[name][0].data_modified < conversion_time:
-                        location_current_files[name] = (
-                            File(path=file, name=name, data_modified=conversion_time, parent=self.location),
-                            "modified", location_number)
-                    elif location_current_files[name][0].data_modified == conversion_time:
-                        location_current_files[name] = (
-                            File(path=file, name=name, data_modified=conversion_time, parent=self.location),
-                            "unchanged", location_number)
-                elif location_1_2_files[name][0].data_modified < conversion_time:
-                    location_current_files[name] = (
-                        File(path=file, name=name, data_modified=conversion_time, parent=self.location),
-                        "modified", location_number)
-
-        except ftplib.all_errors as e:
-            logging.error(f"FTP files error: {e}")
-            self.connection.quit()
-            sys.exit(1)
 
     def print_files(self):
         try:
@@ -99,3 +63,6 @@ class Ftp:
         result = ("Ftp: \n" + "Host: " + self.host + " " + "Username: " + self.username +
                   " " + "Password: " + self.password + " " + "Virtual Path: " + self.virtual_path)
         return result
+
+    def get_abs_real_path(self):
+        return self.virtual_path
