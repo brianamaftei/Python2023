@@ -1,11 +1,33 @@
 import os
 import sys
+import tempfile
 import zipfile
+import time
 from File import File
 
+
+def extract_zip_to_temp(zip_path):
+    temp_dir = tempfile.mkdtemp()
+    with zipfile.ZipFile(zip_path) as z:
+        z.extractall(temp_dir)
+        for file_info in z.infolist():
+            if os.path.isdir(os.path.join(temp_dir, file_info.filename)):
+                continue
+            extracted_path = os.path.join(temp_dir, file_info.filename)
+            date_modified = time.mktime(file_info.date_time + (0, 0, -1))
+            os.utime(extracted_path, (date_modified, date_modified))
+
+        for file_info in z.infolist():
+            if os.path.isdir(os.path.join(temp_dir, file_info.filename)):
+                extracted_path = os.path.join(temp_dir, file_info.filename)
+                date_modified = time.mktime(file_info.date_time + (0, 0, -1))
+                os.utime(extracted_path, (date_modified, date_modified))
+    return temp_dir
+
+
 class Zip(File):
-    def __init__(self, name, data_modified, real_parent, temporary_parent=None):
-        super().__init__(name, data_modified, real_parent, temporary_parent)
+    def __init__(self, name, data_modified, real_parent=None, temporary_parent=None, type_parent=None):
+        super().__init__(name, data_modified, real_parent, temporary_parent, type_parent)
         self.path = self.get_abs_real_path()
 
     def verify_path(self):
@@ -36,3 +58,5 @@ class Zip(File):
 
     def __str__(self):
         return "Zip: " + self.path
+
+
