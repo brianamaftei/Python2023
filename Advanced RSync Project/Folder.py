@@ -5,24 +5,6 @@ import sys
 from File import File
 
 
-def copy_file_from(file, destination):
-    try:
-        shutil.copy2(file, destination)
-        logging.info(f"File {file} copied from {destination}")
-    except shutil.Error as e:
-        logging.error(f"Folder copy error: {e}")
-        sys.exit(1)
-
-
-def copy_file_to(file, destination):
-    try:
-        shutil.copy2(file, destination)
-        logging.info(f"File {file} copied to {destination}")
-    except shutil.Error as e:
-        logging.error(f"Folder copy error: {e}")
-        sys.exit(1)
-
-
 class Folder(File):
     def __init__(self, name, data_modified, real_parent=None, temporary_parent=None, type_parent=None):
         super().__init__(name, data_modified, real_parent, temporary_parent, type_parent)
@@ -47,7 +29,7 @@ class Folder(File):
         return "Folder: " + self.path
 
     @classmethod
-    def copy_folder_from(cls, folder, destination):
+    def copy_folder(cls, folder, destination):
         try:
             shutil.copytree(folder, destination)
             logging.info(f"Folder {folder} copied from {destination}")
@@ -56,10 +38,10 @@ class Folder(File):
             sys.exit(1)
 
     @classmethod
-    def copy_folder_to(cls, folder, destination):
+    def copy_file(cls, file, destination):
         try:
-            shutil.copytree(folder, destination)
-            logging.info(f"Folder {folder} copied to {destination}")
+            shutil.copy2(file, destination)
+            logging.info(f"File {file} copied from {destination}")
         except shutil.Error as e:
             logging.error(f"Folder copy error: {e}")
             sys.exit(1)

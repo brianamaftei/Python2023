@@ -2,7 +2,7 @@ import os
 
 
 class File:
-    def __init__(self, name, data_modified, real_parent=None, temporary_parent=None, type_parent=None):
+    def __init__(self, name, data_modified, real_parent, temporary_parent=None, type_parent=None):
         self.name = name
         if "." not in self.name:
             self.extension = "folder"
