@@ -71,7 +71,7 @@ class Folder(File):
         try:
             shutil.rmtree(file_path_1)
             logging.info(f"Folder {file_path_1} deleted")
-        except shutil.Error as e:
+        except (OSError, shutil.Error) as e:
             logging.error(f"Delete folder error: {e}")
             sys.exit(1)
 

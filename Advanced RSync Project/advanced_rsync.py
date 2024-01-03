@@ -117,6 +117,8 @@ class Sync:
 
                 self.recursive_balance_differences(self.location_1_2_files, self.location_1, self.location_2)
 
+                self.remove_deleted_elements(self.location_1_2_files)
+
                 if isinstance(self.location_1, Zip):
                     Zip.compress_folder_into_zip(self.location_1.get_temporary_abs_path(),
                                                  self.location_1.get_location())
@@ -176,16 +178,16 @@ class Sync:
             elif file[1] == "deleted":
                 if file[2] == 1:
                     if isinstance(file[0], Folder):
-                        Folder.delete_folder(file_path_1)
-                    else:
-                        Folder.delete_file(file_path_1)
-                else:
-                    if isinstance(file[0], Folder):
                         Folder.delete_folder(file_path_2)
                     else:
                         Folder.delete_file(file_path_2)
+                else:
+                    if isinstance(file[0], Folder):
+                        Folder.delete_folder(file_path_1)
+                    else:
+                        Folder.delete_file(file_path_1)
 
-            if file[1] not in ["added", "deleted"] and isinstance(file[0], Folder):
+            if file[1] not in ["added"] and isinstance(file[0], Folder):
                 self.recursive_balance_differences(file, location_1, location_2)
 
     # sa inceapa sincronizarea daca se modificia data de modificare la fiecare prima locatie
@@ -323,7 +325,8 @@ class Sync:
             else:
                 next_2 = location_2_files[3][key]
 
-            if isinstance(file[0], Folder):
+            print(f"key {key} file {file} next_1_2 {next_1_2} next_1 {next_1} next_2 {next_2}")
+            if isinstance(file[0], Folder) and file[1] != "deleted":
                 self.compare_location_current_files(next_1_2, next_1, next_2,
                                                     new_location_1_2_files[3][key])
 
@@ -362,10 +365,10 @@ class Sync:
 
     @classmethod
     def deleted_comparison(cls, location_1, location_2):
-        if location_1 == "deleted":
-            return [location_1[0], "deleted", location_1[2], location_1[3]]
-        elif location_2 == "deleted":
-            return [location_2[0], "deleted", location_2[2], location_2[3]]
+        if location_1[1] == "deleted":
+            return [location_1[0], "deleted", location_1[2], {}]
+        elif location_2[1] == "deleted":
+            return [location_2[0], "deleted", location_2[2], {}]
 
     @classmethod
     def modified_comparison(cls, location_1, location_2, location_1_2):
@@ -403,6 +406,20 @@ class Sync:
             return [location_2[0], "modified", location_2[2], {}]
 
         print("AICI NU TREBUIE SA AJUNGA")
+
+    def remove_deleted_elements(self, location_1_2_files):
+        keys_to_remove = []
+        for key in location_1_2_files[3].keys():
+            file = location_1_2_files[3][key]
+            if file[1] == "deleted":
+                keys_to_remove.append(key)
+
+        for key in keys_to_remove:
+            location_1_2_files[3].pop(key)
+
+        for key, file in location_1_2_files[3].items():
+            if isinstance(file[0], Folder):
+                self.remove_deleted_elements(file)
 
 
 def main():
