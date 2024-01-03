@@ -1,3 +1,4 @@
+import errno
 import logging
 import os
 import shutil
@@ -44,5 +45,41 @@ class Folder(File):
             shutil.copy2(file, destination)
             logging.info(f"File {file} copied from {destination}")
         except shutil.Error as e:
-            logging.error(f"Folder copy error: {e}")
+            if isinstance(e, PermissionError) and e.errno == errno.EACCES:
+                logging.warning(f"Permission error at copying: {e}. Maybe a file is opened...")
+                sys.exit(1)
+            else:
+                logging.error(f"Folder copy error: {e}")
+                sys.exit(1)
+
+    @classmethod
+    def modify_file(cls, file, destination):
+        try:
+            print(f"file {file} modified from {destination}")
+            shutil.copy2(file, destination)
+            logging.info(f"File {file} overwritten from {destination}")
+        except shutil.Error as e:
+            if isinstance(e, PermissionError) and e.errno == errno.EACCES:
+                logging.warning(f"Permission error at overwritten: {e}. Maybe a file is opened...")
+                sys.exit(1)
+            else:
+                logging.error(f"Folder overwritten error: {e}")
+                sys.exit(1)
+
+    @classmethod
+    def delete_folder(cls, file_path_1):
+        try:
+            shutil.rmtree(file_path_1)
+            logging.info(f"Folder {file_path_1} deleted")
+        except shutil.Error as e:
+            logging.error(f"Delete folder error: {e}")
+            sys.exit(1)
+
+    @classmethod
+    def delete_file(cls, file_path_1):
+        try:
+            os.remove(file_path_1)
+            logging.info(f"File {file_path_1} deleted")
+        except OSError as e:
+            logging.error(f"Delete file error: {e}")
             sys.exit(1)

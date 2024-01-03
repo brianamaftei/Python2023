@@ -108,9 +108,14 @@ class Sync:
 
                 self.location_1_2_files.clear()
                 self.location_1_2_files = new_location_1_2_files.copy()
+                print("Location 1")
+                print_dictionary(location_current_files_1[3])
+                print("Location 2")
+                print_dictionary(location_current_files_2[3])
+                print("Location 1 2")
+                print_dictionary(self.location_1_2_files[3])
 
-                self.recursive_balance_differences(self.location_1_2_files, self.location_1, self.location_2, 1)
-                self.recursive_balance_differences(self.location_1_2_files, self.location_2, self.location_1, 2)
+                self.recursive_balance_differences(self.location_1_2_files, self.location_1, self.location_2)
 
                 if isinstance(self.location_1, Zip):
                     Zip.compress_folder_into_zip(self.location_1.get_temporary_abs_path(),
@@ -141,25 +146,47 @@ class Sync:
             root_ = self.location_2.get_temporary_abs_path()
         else:
             root_ = self.location_1.get_temporary_abs_path()
-        print(f"root {root_} current location relative path {current_relative_abs_path}", end=" ")
+        # print(f"root {root_} current location relative path {current_relative_abs_path}", end=" ")
         mirror = os.path.join(root_, current_relative_abs_path)
-        print(f"mirror {mirror}")
+        # print(f"mirror {mirror}")
         return mirror
 
-    def recursive_balance_differences(self, location_current_files, location_1, location_2, location_number):
+    def recursive_balance_differences(self, location_current_files, location_1, location_2):
         files = location_current_files[3]
         for key in files.keys():
             file = files[key]
             relative_path = file[0].get_relative_path()
-            print(f"relative path {relative_path}")
+            file_path_1 = os.path.join(location_1.get_temporary_abs_path(), relative_path)
+            file_path_2 = os.path.join(location_2.get_temporary_abs_path(), relative_path)
+            # print(f"relative path {relative_path}")
             mirror_path = self.mirror_path(relative_path, file[2])
-            if file[1] == "unchanged":
-                continue
-            elif file[1] == "added":
-                if file[2] == location_number:
-                    file_path = os.path.join(location_1.get_temporary_abs_path(), relative_path)
-                    self._add(file_path, mirror_path, location_1, location_2, file)
+            if file[1] == "added":
+                if file[2] == 1:
+                    self._add(file_path_1, mirror_path, location_1, location_2, file)
+                else:
+                    self._add(file_path_2, mirror_path, location_2, location_1, file)
+            elif file[1] == "modified":
+                print(f"file {file[0].name}")
+                if file[2] == 1:
+                    if not isinstance(file[0], Folder):
+                        self._modify(file_path_1, mirror_path, location_1, location_2)
+                else:
+                    if not isinstance(file[0], Folder):
+                        self._modify(file_path_2, mirror_path, location_2, location_1)
+            elif file[1] == "deleted":
+                if file[2] == 1:
+                    if isinstance(file[0], Folder):
+                        Folder.delete_folder(file_path_1)
+                    else:
+                        Folder.delete_file(file_path_1)
+                else:
+                    if isinstance(file[0], Folder):
+                        Folder.delete_folder(file_path_2)
+                    else:
+                        Folder.delete_file(file_path_2)
 
+            if file[1] not in ["added", "deleted"] and isinstance(file[0], Folder):
+                self.recursive_balance_differences(file, location_1, location_2)
 
     # sa inceapa sincronizarea daca se modificia data de modificare la fiecare prima locatie
 
@@ -186,9 +213,18 @@ class Sync:
             if isinstance(object_of_type, Folder):
                 Folder.copy_folder(source, destination)
                 # Sync.recursive_balance_differences(self, file) nu are rost sa mai merg ca deja am copiat folderul
-
             else:
                 Folder.copy_file(source, destination)
+
+    def _modify(self, source, destination, location_1, location_2):
+        if isinstance(location_1, FtpLocation) and isinstance(location_2, FtpLocation):
+            FtpLocation.copy_file_from_ftp_to_ftp(location_1.connection, location_2.connection, source)
+        elif isinstance(location_1, FtpLocation) and not isinstance(location_2, FtpLocation):
+            FtpLocation.copy_ftp_file_to(location_1.connection, source, destination)
+        elif not isinstance(location_1, FtpLocation) and isinstance(location_2, FtpLocation):
+            FtpLocation.copy_file_to_ftp(location_2.connection, source, destination)
+        else:
+            Folder.copy_file(source, destination)
 
     def location_walk(self, current_path, location_number, location_current_files, location_1_2_files, real_path,
                       type_current_location="folder", relative_path=""):
@@ -226,7 +262,7 @@ class Sync:
                     location_current_files[3][key] = [object_of_type, "modified", location_number, {}]
                     location_1_2_key_exists = True
                 elif location_1_2_files[3][key][0].data_modified == data_modified:
-                    location_current_files[3][key] = [object_of_type, "unchanged", 0, {}]
+                    location_current_files[3][key] = [location_1_2_files[3][key][0], "unchanged", 57, {}]
                     location_1_2_key_exists = True
 
                 if location_1_2_key_exists:
@@ -251,35 +287,45 @@ class Sync:
 
     def compare_location_current_files(self, location_1_2_files, location_1_files, location_2_files,
                                        new_location_1_2_files):
-        new_location_1_2_files[3] = location_1_files[3].copy()
-        for key in location_2_files[3].keys():
-            if key not in location_1_files[3].keys():
-                new_location_1_2_files[3][key] = location_2_files[3][key]
-            else:
-                if location_1_files[3][key][1] == "deleted" or location_1_files[3][key][1] == "deleted":
-                    new_location_1_2_files[3][key] = Sync.deleted_comparison(location_1_files[3][key],
-                                                                             location_1_files[3][key])
-                elif location_1_files[3][key][1] == "modified" or location_1_files[3][key][1] == "modified":
-                    new_location_1_2_files[3][key] = Sync.modified_comparison(location_1_files[3][key],
-                                                                              location_2_files[3][key],
-                                                                              location_1_2_files[3][key])
-                elif location_1_files[3][key][1] == "added" and location_1_files[3][key][1] == "added":
-                    new_location_1_2_files[3][key] = Sync.added_comparison(location_1_files[3][key],
-                                                                           location_2_files[3][key])
+        if len(location_1_files) == 4:
+            new_location_1_2_files[3] = location_1_files[3].copy()
+
+        if len(location_2_files) == 4:
+            for key in location_2_files[3].keys():
+                if len(location_1_files) < 4 or key not in location_1_files[3].keys():
+                    new_location_1_2_files[3][key] = location_2_files[3][key]
+                else:
+                    if location_1_files[3][key][1] == "deleted" or location_2_files[3][key][1] == "deleted":
+                        new_location_1_2_files[3][key] = Sync.deleted_comparison(location_1_files[3][key],
+                                                                                 location_2_files[3][key])
+                    elif location_1_files[3][key][1] == "modified" or location_2_files[3][key][1] == "modified":
+                        new_location_1_2_files[3][key] = Sync.modified_comparison(location_1_files[3][key],
+                                                                                  location_2_files[3][key],
+                                                                                  location_1_2_files[3][key])
+                    elif location_1_files[3][key][1] == "added" and location_2_files[3][key][1] == "added":
+                        new_location_1_2_files[3][key] = Sync.added_comparison(location_1_files[3][key],
+                                                                               location_2_files[3][key])
 
         for key in new_location_1_2_files[3].keys():
             file = new_location_1_2_files[3][key]
-
             if len(location_1_2_files) < 4 or key not in location_1_2_files[3].keys():
                 next_1_2 = []
             else:
-                next_1_2 = location_1_2_files[3][key]
+                next_1_2 = location_1_2_files[3][key]  # IN MOD NORMAL NU INTRA AICI
 
-                print(f"key {key} location 1 {location_1_files[3][key]} location 2 {location_2_files[3][key]}")
-                if key in location_1_files[3].keys() and key in location_2_files[3].keys():
-                    if isinstance(file[0], Folder) or isinstance(file[0], Zip):
-                        self.compare_location_current_files(next_1_2, location_1_files[3][key], location_2_files[3][key],
-                                                            new_location_1_2_files[3][key])
+            if len(location_1_files) < 4 or key not in location_1_files[3].keys():
+                next_1 = []
+            else:
+                next_1 = location_1_files[3][key]
+
+            if len(location_2_files) < 4 or key not in location_2_files[3].keys():
+                next_2 = []
+            else:
+                next_2 = location_2_files[3][key]
+
+            if isinstance(file[0], Folder):
+                self.compare_location_current_files(next_1_2, next_1, next_2,
+                                                    new_location_1_2_files[3][key])
 
     def check_differences(self, location_current_files_1, location_current_files_2):
         if isinstance(self.location_1, Folder):
@@ -328,7 +374,7 @@ class Sync:
         location_2_data = location_2[0].data_modified
 
         if location_1_data == location_2_data:
-            return [location_1[0], "unchanged", location_1[2], location_1[3]]
+            return [location_1[0], "unchanged", 88, location_1[3]]
 
         if location_1_data == old_data:
             return [location_2[0], "modified", location_2[2], location_2[3]]
@@ -336,19 +382,27 @@ class Sync:
         if location_2_data == old_data:
             return [location_1[0], "modified", location_1[2], location_1[3]]
 
+        if location_1_data > location_2_data:
+            return [location_1[0], "modified", location_1[2], location_1[3]]
+
+        if location_1_data < location_2_data:
+            return [location_2[0], "modified", location_2[2], location_2[3]]
+
     @classmethod
     def added_comparison(cls, location_1, location_2):
         location_1_data = location_1[0].data_modified
         location_2_data = location_2[0].data_modified
 
         if location_1_data == location_2_data:
-            return [location_1[0], "unchanged", 0, location_1[3]]
+            return [location_1[0], "unchanged", 0, {}]
 
         if location_1_data > location_2_data:
-            return [location_1[0], "modified", location_1[2], location_1[3]]
+            return [location_1[0], "modified", location_1[2], {}]
 
         if location_1_data < location_2_data:
-            return [location_2[0], "modified", location_2[2], location_2[3]]
+            return [location_2[0], "modified", location_2[2], {}]
+
+        print("AICI NU TREBUIE SA AJUNGA")
 
 
 def main():
