@@ -6,16 +6,17 @@ from File import File
 
 
 class Folder(File):
-    def __init__(self, name, data_modified, real_parent=None, temporary_parent=None, type_parent=None):
-        super().__init__(name, data_modified, real_parent, temporary_parent, type_parent)
+    def __init__(self, name, data_modified, real_parent=None, temporary_parent=None, type_parent=None, relative_path=None):
+        super().__init__(name, data_modified, real_parent, temporary_parent, type_parent, relative_path)
         self.path = self.get_abs_real_path()
 
-    def verify_path(self):
+    @classmethod
+    def verify_path(cls, path):
         try:
-            if not os.path.isdir(self.path):
-                raise OSError(f"The folder path {self.path} is not valid")
-            print(f"Folder {self.name} exists")
-        except OSError as e:
+            if not os.path.isdir(path):
+                raise OSError(f"The folder path {path} is not valid")
+            print(f"Folder {path} exists")
+        except (OSError, FileNotFoundError) as e:
             print(type(e), str(e))
             sys.exit(1)
 

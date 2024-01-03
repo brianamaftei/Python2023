@@ -12,25 +12,25 @@ from Zip import Zip
 
 def setup_location(location):
     try:
-        if location.count(":") < 1:
-            raise ValueError("Invalid location type")
+        if location.count(":") < 2:
+            raise ValueError("Invalid location type format")
         type_location = location.split(":", 1)[0]
         location_path = location.split(":", 1)[1]
         if type_location == "ftp":
             object_of_type = FtpLocation(location_path)
         elif type_location == "zip":
+            Zip.verify_path(location_path)
             name = os.path.basename(location_path)
             real_parent = location_path.split(name)[0]
             data_modified = datetime.fromtimestamp(os.path.getmtime(location_path))
+
             object_of_type = Zip(name=name, data_modified=data_modified, real_parent=real_parent)
-            object_of_type.verify_path()
-            object_of_type.set_temporary_abs_path(location_path)
         elif type_location == "folder":
+            Folder.verify_path(location_path)
             name = os.path.basename(location_path)
             real_parent = location_path.split(name)[0]
             data_modified = datetime.fromtimestamp(os.path.getmtime(location_path))
             object_of_type = Folder(name=name, data_modified=data_modified, real_parent=real_parent)
-            object_of_type.verify_path()
             object_of_type.set_temporary_abs_path(location_path)
         else:
             raise ValueError("Invalid location type")
@@ -40,21 +40,27 @@ def setup_location(location):
         sys.exit(1)
 
 
-def print_dictionary(dictionary):
-    for key in dictionary:
-        print("Key: " + key + " Value: " + dictionary[key].__str__())
+def print_dictionary(dictionary, level=0):
+    for key in dictionary.items():
+        print("Key: " + key[0] + " Value: " + str(key[1]))
 
 
-def object_specific_type(name, current_path, data_modified, real_path, type_current_location):
+def print_list(item, level=0):
+    print(item[0].name + " " + item[1] + " " + str(item[2]))
+    print(" " * level, end="")
+    print_dictionary(item[3], level + 1)
+
+
+def object_specific_type(name, current_path, data_modified, real_path, type_current_location, relative_path):
     if os.path.isdir(os.path.join(current_path, name)):
         return Folder(name=name, data_modified=data_modified, real_parent=real_path,
-                      temporary_parent=current_path, type_parent=type_current_location)
+                      temporary_parent=current_path, type_parent=type_current_location, relative_path=relative_path)
     elif name.split(".")[-1] == "zip":
         return Zip(name=name, data_modified=data_modified, real_parent=real_path,
-                   temporary_parent=current_path, type_parent=type_current_location)
+                   temporary_parent=current_path, type_parent=type_current_location, relative_path=relative_path)
     elif os.path.isfile(os.path.join(current_path, name)):
         return File(name=name, data_modified=data_modified, real_parent=real_path,
-                    temporary_parent=current_path, type_parent=type_current_location)
+                    temporary_parent=current_path, type_parent=type_current_location, relative_path=relative_path)
     else:
         raise ValueError("Invalid file type")
 
@@ -74,10 +80,9 @@ class Sync:
     def __init__(self, arg1, arg2):
         self.location_1 = setup_location(arg1)
         self.location_2 = setup_location(arg2)
-
-        self.location_1_2_files = {}
-        self.location_current_files = [File(name="Original", data_modified=datetime.now(), real_parent=""), "unique", 0,
-                                       {}]
+        self.location_1_2_files = [
+            File(name="Original", data_modified=datetime.now(), real_parent="", relative_path=""),
+            "unique", 0, {}]
         if isinstance(self.location_1, FtpLocation):
             self.connection = self.location_1.connection
         elif isinstance(self.location_2, FtpLocation):
@@ -91,46 +96,70 @@ class Sync:
         self.location_1.print_files()
         self.location_2.print_files()
         while True:
-            self.check_differences()
-            print_dictionary(self.location_current_files[3])
-            self.recursive_balance_differences(self.location_current_files)
-            self.set_new_state()
-            print("Press enter to continue")
-            input()
+            try:
+                location_current_files_1 = [self.location_1, "unique", 0, {}]
+                location_current_files_2 = [self.location_2, "unique", 0, {}]
+                new_location_1_2_files = [
+                    File(name="Original", data_modified=datetime.now(), real_parent="", relative_path=""),
+                    "unique", 0, {}]
+                self.check_differences(location_current_files_1, location_current_files_2)
+                self.compare_location_current_files(self.location_1_2_files, location_current_files_1,
+                                                    location_current_files_2, new_location_1_2_files)
 
-    def mirror_path(self, current_location_abs_path, location_number):
+                self.location_1_2_files.clear()
+                self.location_1_2_files = new_location_1_2_files.copy()
+
+                self.recursive_balance_differences(self.location_1_2_files, self.location_1, self.location_2, 1)
+                self.recursive_balance_differences(self.location_1_2_files, self.location_2, self.location_1, 2)
+
+                if isinstance(self.location_1, Zip):
+                    Zip.compress_folder_into_zip(self.location_1.get_temporary_abs_path(),
+                                                 self.location_1.get_location())
+
+                if isinstance(self.location_2, Zip):
+                    Zip.compress_folder_into_zip(self.location_2.get_temporary_abs_path(),
+                                                 self.location_2.get_location())
+
+                print("Press enter to continue or quit to exit")
+                result = input()
+                if result == "quit":
+                    break
+
+            except KeyboardInterrupt:
+                print("KeyboardInterrupt")
+                break
+
+            finally:
+                if isinstance(self.location_1, FtpLocation):
+                    self.location_1.disconnect_from_server()
+
+                if isinstance(self.location_2, FtpLocation):
+                    self.location_2.disconnect_from_server()
+
+    def mirror_path(self, current_relative_abs_path, location_number):
         if location_number == 1:
-            root = self.location_1.get_temporary_abs_path()
-            relative_path = current_location_abs_path.split(root)[1]
-            relative_path = relative_path[1:]
-            print(
-                f"Current location abs path {current_location_abs_path}, root {root}, the other path {self.location_2.get_abs_real_path()}")
+            root_ = self.location_2.get_temporary_abs_path()
+        else:
+            root_ = self.location_1.get_temporary_abs_path()
+        print(f"root {root_} current location relative path {current_relative_abs_path}", end=" ")
+        mirror = os.path.join(root_, current_relative_abs_path)
+        print(f"mirror {mirror}")
+        return mirror
 
-            print(
-                f"Root {root} Relative path {relative_path} result {os.path.join(self.location_2.get_abs_real_path(), relative_path)} ")
-
-            return os.path.join(self.location_2.get_abs_real_path(), relative_path)
-        elif location_number == 2:
-            root = self.location_2.get_temporary_abs_path()
-            relative_path = current_location_abs_path.split(root)[1]
-            relative_path = relative_path[1:]
-            print(f"Root {root} Relative path {relative_path}")
-
-            return os.path.join(self.location_1.get_abs_real_path(), relative_path)
-
-    def recursive_balance_differences(self, location_current_files):
+    def recursive_balance_differences(self, location_current_files, location_1, location_2, location_number):
         files = location_current_files[3]
         for key in files.keys():
             file = files[key]
-            file_path = file[0].get_temporary_abs_path()
-            mirror_path = self.mirror_path(file_path, file[2])
+            relative_path = file[0].get_relative_path()
+            print(f"relative path {relative_path}")
+            mirror_path = self.mirror_path(relative_path, file[2])
             if file[1] == "unchanged":
                 continue
             elif file[1] == "added":
-                if file[2] == 1:
-                    self._add(file_path, mirror_path, self.location_1, self.location_2, file)
-                elif file[2] == 2:
-                    self._add(file_path, mirror_path, self.location_2, self.location_1, file)
+                if file[2] == location_number:
+                    file_path = os.path.join(location_1.get_temporary_abs_path(), relative_path)
+                    self._add(file_path, mirror_path, location_1, location_2, file)
+
 
     # sa inceapa sincronizarea daca se modificia data de modificare la fiecare prima locatie
 
@@ -156,19 +185,20 @@ class Sync:
         else:
             if isinstance(object_of_type, Folder):
                 Folder.copy_folder(source, destination)
-                Sync.recursive_balance_differences(self, file)
+                # Sync.recursive_balance_differences(self, file) nu are rost sa mai merg ca deja am copiat folderul
+
             else:
                 Folder.copy_file(source, destination)
 
     def location_walk(self, current_path, location_number, location_current_files, location_1_2_files, real_path,
-                      type_current_location="folder"):
+                      type_current_location="folder", relative_path=""):
         try:
             if type_current_location == "ftp":
                 list_of_files = self.connection.nlst()
             else:
                 list_of_files = os.listdir(current_path)
-            if len(location_1_2_files) == 4:
 
+            if len(location_1_2_files) == 4:
                 for file in location_1_2_files[3].keys():
                     if type_current_location == "ftp":
                         key = file.split("/")[-1]
@@ -186,19 +216,12 @@ class Sync:
                     data_modified = datetime.strptime(time_str[:14], '%Y%m%d%H%M%S')
                 else:
                     data_modified = datetime.fromtimestamp(os.path.getmtime(os.path.join(current_path, file)))
+                relative_ = os.path.join(relative_path, file)
                 object_of_type = object_specific_type(file, current_path, data_modified, real_path,
-                                                      type_current_location)
+                                                      type_current_location, relative_)
                 location_1_2_key_exists = False
-
                 if len(location_1_2_files) < 4 or file not in location_1_2_files[3].keys():
-                    if file not in location_current_files[3].keys():
-                        location_current_files[3][key] = [object_of_type, "added", location_number, {}]
-                    elif location_current_files[3][key][0].data_modified < data_modified:
-                        location_current_files[3][key] = [object_of_type, "modified", location_number, {}]
-                    elif location_current_files[3][key][0].data_modified == data_modified:
-                        location_current_files[3][key] = [object_of_type, "unchanged", 0, {}]
-                    elif location_current_files[3][key][0].data_modified > data_modified:
-                        location_current_files[3][key][1] = "modified"
+                    location_current_files[3][key] = [object_of_type, "added", location_number, {}]
                 elif location_1_2_files[3][key][0].data_modified != data_modified:
                     location_current_files[3][key] = [object_of_type, "modified", location_number, {}]
                     location_1_2_key_exists = True
@@ -210,10 +233,11 @@ class Sync:
                     location_1_2 = location_1_2_files[3][key]
                 else:
                     location_1_2 = []
+
                 if isinstance(object_of_type, Folder):
                     self.location_walk(os.path.join(current_path, file), location_number,
                                        location_current_files[3][key],
-                                       location_1_2, os.path.join(real_path, file))
+                                       location_1_2, os.path.join(real_path, file), "folder", relative_)
 
         except (OSError, zipfile.BadZipFile) as e:
             print(f"Error at checking the differences in {type(location_current_files[0])} {current_path}",
@@ -225,41 +249,106 @@ class Sync:
             self.connection.quit()
             sys.exit(1)
 
-    def check_differences(self):
+    def compare_location_current_files(self, location_1_2_files, location_1_files, location_2_files,
+                                       new_location_1_2_files):
+        new_location_1_2_files[3] = location_1_files[3].copy()
+        for key in location_2_files[3].keys():
+            if key not in location_1_files[3].keys():
+                new_location_1_2_files[3][key] = location_2_files[3][key]
+            else:
+                if location_1_files[3][key][1] == "deleted" or location_1_files[3][key][1] == "deleted":
+                    new_location_1_2_files[3][key] = Sync.deleted_comparison(location_1_files[3][key],
+                                                                             location_1_files[3][key])
+                elif location_1_files[3][key][1] == "modified" or location_1_files[3][key][1] == "modified":
+                    new_location_1_2_files[3][key] = Sync.modified_comparison(location_1_files[3][key],
+                                                                              location_2_files[3][key],
+                                                                              location_1_2_files[3][key])
+                elif location_1_files[3][key][1] == "added" and location_1_files[3][key][1] == "added":
+                    new_location_1_2_files[3][key] = Sync.added_comparison(location_1_files[3][key],
+                                                                           location_2_files[3][key])
+
+        for key in new_location_1_2_files[3].keys():
+            file = new_location_1_2_files[3][key]
+
+            if len(location_1_2_files) < 4 or key not in location_1_2_files[3].keys():
+                next_1_2 = []
+            else:
+                next_1_2 = location_1_2_files[3][key]
+
+                print(f"key {key} location 1 {location_1_files[3][key]} location 2 {location_2_files[3][key]}")
+                if key in location_1_files[3].keys() and key in location_2_files[3].keys():
+                    if isinstance(file[0], Folder) or isinstance(file[0], Zip):
+                        self.compare_location_current_files(next_1_2, location_1_files[3][key], location_2_files[3][key],
+                                                            new_location_1_2_files[3][key])
+
+    def check_differences(self, location_current_files_1, location_current_files_2):
         if isinstance(self.location_1, Folder):
-            self.location_walk(self.location_1.get_abs_real_path(), 1, self.location_current_files,
+            self.location_walk(self.location_1.get_abs_real_path(), 1, location_current_files_1,
                                self.location_1_2_files,
                                self.location_1.get_abs_real_path())
         elif isinstance(self.location_1, Zip):
             temp_dir = Zip.extract_zip_to_temp(self.location_1.get_location())
             self.location_1.set_temporary_abs_path(temp_dir)
-            self.location_walk(temp_dir, 1, self.location_current_files, self.location_1_2_files,
-                               self.location_1.get_abs_real_path(), "zip")
+            # self.location_1.set_name(os.path.basename(temp_dir))
+            self.location_walk(temp_dir, 1, location_current_files_1, self.location_1_2_files,
+                               self.location_1.get_temporary_abs_path(), "zip")
         elif isinstance(self.location_1, FtpLocation):
-            self.location_walk(self.location_1.get_abs_real_path(), 1, self.location_current_files,
+            self.location_walk(self.location_1.get_abs_real_path(), 1, location_current_files_1,
                                self.location_1_2_files,
                                self.location_1.get_abs_real_path(), "ftp")
 
         if isinstance(self.location_2, Folder):
-            self.location_walk(self.location_2.get_abs_real_path(), 2, self.location_current_files,
+            self.location_walk(self.location_2.get_abs_real_path(), 2, location_current_files_2,
                                self.location_1_2_files,
                                self.location_2.get_abs_real_path())
         elif isinstance(self.location_2, Zip):
             temp_dir = Zip.extract_zip_to_temp(self.location_2.get_location())
-            self.location_2.set_temporary_path_of_parent(temp_dir)
-            self.location_walk(temp_dir, 2, self.location_current_files, self.location_1_2_files,
-                               self.location_2.get_abs_real_path())
+            self.location_2.set_temporary_abs_path(temp_dir)
+            self.location_walk(temp_dir, 2, location_current_files_2, self.location_1_2_files,
+                               self.location_2.get_temporary_abs_path(), "zip")
         elif isinstance(self.location_2, FtpLocation):
-            self.location_walk(self.location_2.get_abs_real_path(), 2, self.location_current_files,
+            self.location_walk(self.location_2.get_abs_real_path(), 2, location_current_files_2,
                                self.location_1_2_files,
                                self.location_2.get_abs_real_path(), "ftp")
 
     def set_new_state(self):
-        self.location_1_2_files.clear()
-        self.location_1_2_files = self.location_current_files.copy()
-        self.location_current_files.clear()
-        self.location_current_files = [File(name="Original", data_modified=datetime.now(), real_parent=""), "unique",
-                                       0, {}]
+        pass
+
+    @classmethod
+    def deleted_comparison(cls, location_1, location_2):
+        if location_1 == "deleted":
+            return [location_1[0], "deleted", location_1[2], location_1[3]]
+        elif location_2 == "deleted":
+            return [location_2[0], "deleted", location_2[2], location_2[3]]
+
+    @classmethod
+    def modified_comparison(cls, location_1, location_2, location_1_2):
+        old_data = location_1_2[0].data_modified
+        location_1_data = location_1[0].data_modified
+        location_2_data = location_2[0].data_modified
+
+        if location_1_data == location_2_data:
+            return [location_1[0], "unchanged", location_1[2], location_1[3]]
+
+        if location_1_data == old_data:
+            return [location_2[0], "modified", location_2[2], location_2[3]]
+
+        if location_2_data == old_data:
+            return [location_1[0], "modified", location_1[2], location_1[3]]
+
+    @classmethod
+    def added_comparison(cls, location_1, location_2):
+        location_1_data = location_1[0].data_modified
+        location_2_data = location_2[0].data_modified
+
+        if location_1_data == location_2_data:
+            return [location_1[0], "unchanged", 0, location_1[3]]
+
+        if location_1_data > location_2_data:
+            return [location_1[0], "modified", location_1[2], location_1[3]]
+
+        if location_1_data < location_2_data:
+            return [location_2[0], "modified", location_2[2], location_2[3]]
 
 
 def main():

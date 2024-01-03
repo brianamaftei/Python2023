@@ -267,3 +267,6 @@ else:
             logging.error(f"FTP files error: {e}")
             self.connection.quit()
             sys.exit(1)
+
+
+  #la deleted sa verific daca mai exista calea daca nu nu o mai sterge

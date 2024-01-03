@@ -2,7 +2,7 @@ import os
 
 
 class File:
-    def __init__(self, name, data_modified, real_parent, temporary_parent=None, type_parent=None):
+    def __init__(self, name, data_modified, real_parent, temporary_parent=None, type_parent=None, relative_path=None):
         self.name = name
         if "." not in self.name:
             self.extension = "folder"
@@ -17,7 +17,10 @@ class File:
             self.temporary_abs_path = None
         else:
             self.temporary_abs_path = os.path.join(self.temporary_parent, self.name)
+        self.relative_path = relative_path
 
+    def set_name(self, name):
+        self.name = name
     def get_name(self):
         return self.name
 
@@ -47,3 +50,6 @@ class File:
 
     def set_temporary_abs_path(self, temporary_location):
         self.temporary_abs_path = temporary_location
+
+    def get_relative_path(self):
+        return self.relative_path
