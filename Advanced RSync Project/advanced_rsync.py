@@ -153,7 +153,6 @@ class Sync:
             root_ = self.location_2.get_temporary_abs_path()
         else:
             root_ = self.location_1.get_temporary_abs_path()
-        # print(f"root {root_} current location relative path {current_relative_abs_path}", end=" ")
 
         if isinstance(location, FtpLocation):
             current_relative_abs_path_ = current_relative_abs_path.replace("\\", "/")
@@ -161,7 +160,6 @@ class Sync:
         else:
             current_relative_abs_path_ = current_relative_abs_path.replace("/", "\\")
             mirror = os.path.join(root_, current_relative_abs_path_)
-        # print(f"mirror {mirror}")
         return mirror
 
     @classmethod
@@ -179,10 +177,7 @@ class Sync:
             file = files[key]
             relative_path = file[0].get_relative_path()
             file_path_1 = Sync.make_path(location_1, relative_path)
-            # file_path_1 = os.path.join(location_1.get_temporary_abs_path(), relative_path)
             file_path_2 = Sync.make_path(location_2, relative_path)
-            # file_path_2 = os.path.join(location_2.get_temporary_abs_path(), relative_path)
-            # print(f"relative path {relative_path}")
             print(f"file path 1 {file_path_1}")
             print(f"file path 2 {file_path_2}")
             mirror_path_1 = self.mirror_path(relative_path, 1, location_2)
@@ -195,7 +190,6 @@ class Sync:
                 else:
                     self._add(file_path_2, mirror_path_2, location_2, location_1, file)
             elif file[1] == "modified":
-                # print(f"file {file[0].name}")
                 if file[2] == 1:
                     if not isinstance(file[0], Folder):
                         self._modify(file_path_1, mirror_path_1, location_1, location_2)
@@ -204,17 +198,11 @@ class Sync:
                         self._modify(file_path_2, mirror_path_2, location_2, location_1)
             elif file[1] == "deleted":
                 if file[2] == 1:
-                    if isinstance(file[0], Folder):
-                        Folder.delete_folder(file_path_2)
-                    else:
-                        Folder.delete_file(file_path_2)
+                    self._delete(file_path_2, location_2, file)
                 else:
-                    if isinstance(file[0], Folder):
-                        Folder.delete_folder(file_path_1)
-                    else:
-                        Folder.delete_file(file_path_1)
+                    self._delete(file_path_1, location_1, file)
 
-            if file[1] not in ["added"] and isinstance(file[0], Folder):
+            if file[1] not in ["added", "deleted"] and isinstance(file[0], Folder):
                 self.recursive_balance_differences(file, location_1, location_2)
 
     def _add(self, source, destination, location_1, location_2, file):
@@ -252,6 +240,19 @@ class Sync:
         else:
             Folder.copy_file(source, destination)
 
+    def _delete(self, source, location, file):
+        object_of_type = file[0]
+        if isinstance(location, FtpLocation):
+            if isinstance(object_of_type, Folder):
+                FtpLocation.delete_ftp_folder(location.connection, source)
+            else:
+                FtpLocation.delete_ftp_file(location.connection, source)
+        else:
+            if isinstance(object_of_type, Folder):
+                Folder.delete_folder(source)
+            else:
+                Folder.delete_file(source)
+
     def location_walk(self, current_path, location_number, location_current_files, location_1_2_files, real_path,
                       type_current_location=None, connection=None, relative_path=""):
         try:
@@ -287,6 +288,7 @@ class Sync:
                     data_modified += timedelta(hours=2)
                 else:
                     data_modified = datetime.fromtimestamp(os.path.getmtime(os.path.join(current_path, file)))
+                    data_modified = data_modified.replace(microsecond=0)
 
                 relative_ = os.path.join(relative_path, key)
                 object_of_type = object_specific_type(key, current_path, data_modified, real_path,
@@ -354,7 +356,7 @@ class Sync:
             if len(location_1_2_files) < 4 or key not in location_1_2_files[3].keys():
                 next_1_2 = []
             else:
-                next_1_2 = location_1_2_files[3][key]  # IN MOD NORMAL NU INTRA AICI
+                next_1_2 = location_1_2_files[3][key]
 
             if len(location_1_files) < 4 or key not in location_1_files[3].keys():
                 next_1 = []
@@ -431,6 +433,8 @@ class Sync:
         if location_1_data < location_2_data:
             return [location_2[0], "modified", location_2[2], location_2[3]]
 
+        print("Modify AICI NU TREBUIE SA AJUNGA")
+
     @classmethod
     def added_comparison(cls, location_1, location_2):
         location_1_data = location_1[0].data_modified
@@ -445,7 +449,7 @@ class Sync:
         if location_1_data < location_2_data:
             return [location_2[0], "modified", location_2[2], {}]
 
-        print("AICI NU TREBUIE SA AJUNGA")
+        print("Added AICI NU TREBUIE SA AJUNGA")
 
     def remove_deleted_elements(self, location_1_2_files):
         keys_to_remove = []

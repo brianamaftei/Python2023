@@ -4,10 +4,9 @@ import io
 import logging
 import os
 import sys
-import tempfile
 import time
-from ftplib import FTP
 from datetime import datetime, timedelta, timezone
+from ftplib import FTP
 
 logging.basicConfig(level=logging.INFO)
 
@@ -78,6 +77,9 @@ class FtpLocation:
     def get_abs_real_path(self):
         return "." + self.virtual_path
 
+    def get_temporary_abs_path(self):
+        return self.temporary_abs_path
+
     @classmethod
     def copy_file_to_ftp(cls, connection, source, destination):
         try:
@@ -94,14 +96,22 @@ class FtpLocation:
             sys.exit(1)
 
     @classmethod
-    def set_mod_time_on_ftp(cls, connection, path, mod_time):
-        gmt_time = datetime.utcfromtimestamp(mod_time).strftime("%Y%m%d%H%M%S")
+    def set_mod_time_on_ftp_from_ftp(cls, connection, path, mod_time):
         try:
-            connection.sendcmd(f'MDTM {gmt_time} {path}')
+            gmt_time = mod_time.strftime("%Y%m%d%H%M%S")
+            connection.sendcmd(f"MFMT {gmt_time} {path}")
             logging.info(f"Set modification time for {path} to {gmt_time}")
         except ftplib.all_errors as e:
             logging.warning(f"Unable to set modification time on FTP for {path}: {e}")
 
+    @classmethod
+    def set_mod_time_on_ftp(cls, connection, path, mod_time):
+        gmt_time = datetime.fromtimestamp(mod_time, timezone.utc).strftime("%Y%m%d%H%M%S")
+        try:
+            connection.sendcmd(f'MFMT {gmt_time} {path}')
+            logging.info(f"Set modification time for {path} to {gmt_time}")
+        except ftplib.all_errors as e:
+            logging.warning(f"Unable to set modification time on FTP for {path}: {e}")
 
     @classmethod
     def copy_folder_to_ftp(cls, connection, source, destination):
@@ -158,8 +168,8 @@ class FtpLocation:
             for item in list_of_items:
                 name = os.path.basename(item)
                 source_path = os.path.join(source, name)
-                source_path = source_path.replace("\\", "/")
                 dest_path = os.path.join(destination, name)
+                dest_path = dest_path.replace("\\", "/")
                 if cls.is_directory(connection, source_path):
                     cls.copy_ftp_folder_to_folder(connection, source_path, dest_path)
                 else:
@@ -167,39 +177,50 @@ class FtpLocation:
                         connection.retrbinary(f"RETR {source_path}", file.write)
 
                     time_str = connection.voidcmd(f'MDTM {source_path}')[4:]
-                    print(f"Time str: {time_str}")
                     data_modified = datetime.strptime(time_str.strip()[:14], '%Y%m%d%H%M%S')
                     data_modified += timedelta(hours=2)
 
-                    print(f"Timestamp: {data_modified}")
-
                     timestamp = int(time.mktime(data_modified.timetuple()))
-
-                    print(f"Converted Timestamp: {timestamp}")
-
                     os.utime(dest_path, (timestamp, timestamp))
-
+                    logging.info(f"File {source_path} copied to {dest_path}")
 
         except ftplib.all_errors as e:
             logging.error(f"FTP copy ftp folder to error: {e} {source} {destination}")
             sys.exit(1)
 
     @classmethod
+    def get_mod_time_from_ftp(cls, connection, file_path):
+        try:
+            time_str = connection.voidcmd(f'MDTM {file_path}')[4:]
+            data_modified = datetime.strptime(time_str.strip()[:14], '%Y%m%d%H%M%S')
+
+            return data_modified
+        except ftplib.all_errors as e:
+            logging.warning(f"Unable to get modification time for {file_path}: {e}")
+            return None
+
+    @classmethod
     def copy_file_from_ftp_to_ftp(cls, connection_from, connection_to, file):
         try:
+            mod_time = cls.get_mod_time_from_ftp(connection_from, file)
+
             with io.BytesIO() as buffer:
                 connection_from.retrbinary("RETR " + file, buffer.write)
                 buffer.seek(0)
                 connection_to.storbinary("STOR " + file, buffer)
-            logging.info(f"File {file} copied from {connection_from} to {connection_to}")
+            logging.info(f"File {file} copied from ftp to ftp")
+
+            if mod_time:
+                cls.set_mod_time_on_ftp_from_ftp(connection_to, file, mod_time)
+
         except ftplib.all_errors as e:
             logging.error(f"FTP copy file from ftp to ftp error: {e}")
             connection_from.quit()
             connection_to.quit()
             sys.exit(1)
 
-    @classmethod
-    def is_directory(cls, connection, name):
+    @staticmethod
+    def is_directory(connection, name):
         current_directory = connection.pwd()
         try:
             connection.cwd(name)
@@ -215,29 +236,65 @@ class FtpLocation:
         return not cls.is_directory(connection, name)
 
     @classmethod
-    def copy_folder_from_ftp_to_ftp(cls, connection_from, connection_to, source_folder, dest_folder):
+    def copy_folder_from_ftp_to_ftp(cls, connection_from, connection_to, source, dest):
         try:
             try:
-                connection_to.mkd(dest_folder)
-            except ftplib.error_perm:
-                pass
-            list_of_items = connection_from.nlst(source_folder)
+                connection_to.mkd(dest)
+            except ftplib.error_perm as e:
+                logging.info(f"Directory {dest} already exists or cannot be created: {e}")
+
+            list_of_items = connection_from.nlst(source)
             for item in list_of_items:
                 name = os.path.basename(item)
-                source_path = os.path.join(source_folder, name)
-                dest_path = os.path.join(dest_folder, item)
+                source_path = os.path.join(source, name).replace("\\", "/")
+                dest_path = os.path.join(dest, name).replace("\\", "/")
                 if cls.is_directory(connection_from, source_path):
                     cls.copy_folder_from_ftp_to_ftp(connection_from, connection_to, source_path, dest_path)
                 else:
+                    mod_time = cls.get_mod_time_from_ftp(connection_from, source_path)
                     with io.BytesIO() as buffer:
                         connection_from.retrbinary(f"RETR {source_path}", buffer.write)
                         buffer.seek(0)
                         connection_to.storbinary(f"STOR {dest_path}", buffer)
+                        if mod_time:
+                            cls.set_mod_time_on_ftp_from_ftp(connection_to, dest_path, mod_time)
+                    logging.info(f"File {source_path} copied from ftp to ftp")
         except ftplib.all_errors as e:
             logging.error(f"FTP copy folder from ftp to ftp error: {e}")
-            connection_from.quit()
-            connection_to.quit()
+            sys.exit(1)
+    @classmethod
+    def delete_ftp_content_folder(cls, connection, source):
+        try:
+            list_of_items = connection.nlst(source)
+            for item in list_of_items:
+                name = os.path.basename(item)
+                source_path = os.path.join(source, name)
+                source_path = source_path.replace("\\", "/")
+                if cls.is_directory(connection, source_path):
+                    cls.delete_ftp_folder(connection, source_path)
+                else:
+                    connection.delete(source_path)
+                    logging.info(f"File {source_path} deleted")
+
+            connection.rmd(source)
+        except ftplib.all_errors as e:
+            logging.error(f"FTP delete ftp folder error 1: {e} {source}")
             sys.exit(1)
 
-    def get_temporary_abs_path(self):
-        return self.temporary_abs_path
+    @classmethod
+    def delete_ftp_folder(cls, connection, source):
+        try:
+            FtpLocation.delete_ftp_content_folder(connection, source)
+        except ftplib.all_errors as e:
+            logging.error(f"FTP delete ftp folder error 2: {e} {source}")
+            sys.exit(1)
+
+    @classmethod
+    def delete_ftp_file(cls, connection, source):
+        try:
+            connection.delete(source)
+            logging.info(f"File {source} deleted")
+        except ftplib.all_errors as e:
+            logging.error(f"FTP delete ftp file error: {e}")
+            connection.quit()
+            sys.exit(1)
