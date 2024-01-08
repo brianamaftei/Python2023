@@ -2,7 +2,7 @@ import ftplib
 import os
 import sys
 import zipfile
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from File import File
 from Folder import Folder
@@ -51,18 +51,21 @@ def print_list(item, level=0):
     print_dictionary(item[3], level + 1)
 
 
-def object_specific_type(name, current_path, data_modified, real_path, type_current_location, relative_path):
-    if os.path.isdir(os.path.join(current_path, name)):
+def object_specific_type(name, current_path, data_modified, real_path, type_current_location, relative_path, connection,
+                         type_location):
+    if (type_location != "ftp" and os.path.isdir(os.path.join(current_path, name)) or
+            (type_location == "ftp" and FtpLocation.is_directory(connection, current_path + name))):
         return Folder(name=name, data_modified=data_modified, real_parent=real_path,
                       temporary_parent=current_path, type_parent=type_current_location, relative_path=relative_path)
     elif name.split(".")[-1] == "zip":
         return Zip(name=name, data_modified=data_modified, real_parent=real_path,
                    temporary_parent=current_path, type_parent=type_current_location, relative_path=relative_path)
-    elif os.path.isfile(os.path.join(current_path, name)):
+    elif (type_location != "ftp" and os.path.isfile(os.path.join(current_path, name)) or
+          (type_location == "ftp" and FtpLocation.is_file(connection, current_path + name))):
         return File(name=name, data_modified=data_modified, real_parent=real_path,
                     temporary_parent=current_path, type_parent=type_current_location, relative_path=relative_path)
     else:
-        raise ValueError("Invalid file type")
+        raise ValueError("Invalid file type " + str(os.path.join(current_path, name)))
 
 
 def get_type(object_):
@@ -84,11 +87,14 @@ class Sync:
             File(name="Original", data_modified=datetime.now(), real_parent="", relative_path=""),
             "unique", 0, {}]
         if isinstance(self.location_1, FtpLocation):
-            self.connection = self.location_1.connection
-        elif isinstance(self.location_2, FtpLocation):
-            self.connection = self.location_2.connection
+            self.connection_1 = self.location_1.connection
         else:
-            self.connection = None
+            self.connection_1 = None
+
+        if isinstance(self.location_2, FtpLocation):
+            self.connection_2 = self.location_2.connection
+        else:
+            self.connection_2 = None
 
     def start(self):
         print("First Location: " + self.location_1.__str__())
@@ -136,45 +142,66 @@ class Sync:
                 print("KeyboardInterrupt")
                 break
 
-            finally:
-                if isinstance(self.location_1, FtpLocation):
-                    self.location_1.disconnect_from_server()
+        if isinstance(self.location_1, FtpLocation):
+            self.location_1.disconnect_from_server()
 
-                if isinstance(self.location_2, FtpLocation):
-                    self.location_2.disconnect_from_server()
+        if isinstance(self.location_2, FtpLocation):
+            self.location_2.disconnect_from_server()
 
-    def mirror_path(self, current_relative_abs_path, location_number):
+    def mirror_path(self, current_relative_abs_path, location_number, location):
         if location_number == 1:
             root_ = self.location_2.get_temporary_abs_path()
         else:
             root_ = self.location_1.get_temporary_abs_path()
         # print(f"root {root_} current location relative path {current_relative_abs_path}", end=" ")
-        mirror = os.path.join(root_, current_relative_abs_path)
+
+        if isinstance(location, FtpLocation):
+            current_relative_abs_path_ = current_relative_abs_path.replace("\\", "/")
+            mirror = root_ + current_relative_abs_path_
+        else:
+            current_relative_abs_path_ = current_relative_abs_path.replace("/", "\\")
+            mirror = os.path.join(root_, current_relative_abs_path_)
         # print(f"mirror {mirror}")
         return mirror
+
+    @classmethod
+    def make_path(cls, location, relative_path):
+        if isinstance(location, FtpLocation):
+            relative_path_ = relative_path.replace("\\", "/")
+            return location.get_abs_real_path() + relative_path_
+        else:
+            relative_path_ = relative_path.replace("/", "\\")
+            return os.path.join(location.get_temporary_abs_path(), relative_path_)
 
     def recursive_balance_differences(self, location_current_files, location_1, location_2):
         files = location_current_files[3]
         for key in files.keys():
             file = files[key]
             relative_path = file[0].get_relative_path()
-            file_path_1 = os.path.join(location_1.get_temporary_abs_path(), relative_path)
-            file_path_2 = os.path.join(location_2.get_temporary_abs_path(), relative_path)
+            file_path_1 = Sync.make_path(location_1, relative_path)
+            # file_path_1 = os.path.join(location_1.get_temporary_abs_path(), relative_path)
+            file_path_2 = Sync.make_path(location_2, relative_path)
+            # file_path_2 = os.path.join(location_2.get_temporary_abs_path(), relative_path)
             # print(f"relative path {relative_path}")
-            mirror_path = self.mirror_path(relative_path, file[2])
+            print(f"file path 1 {file_path_1}")
+            print(f"file path 2 {file_path_2}")
+            mirror_path_1 = self.mirror_path(relative_path, 1, location_2)
+            mirror_path_2 = self.mirror_path(relative_path, 2, location_1)
+            print(f"mirror path  1 {mirror_path_1}")
+            print(f"mirror path  2 {mirror_path_2}")
             if file[1] == "added":
                 if file[2] == 1:
-                    self._add(file_path_1, mirror_path, location_1, location_2, file)
+                    self._add(file_path_1, mirror_path_1, location_1, location_2, file)
                 else:
-                    self._add(file_path_2, mirror_path, location_2, location_1, file)
+                    self._add(file_path_2, mirror_path_2, location_2, location_1, file)
             elif file[1] == "modified":
-                print(f"file {file[0].name}")
+                # print(f"file {file[0].name}")
                 if file[2] == 1:
                     if not isinstance(file[0], Folder):
-                        self._modify(file_path_1, mirror_path, location_1, location_2)
+                        self._modify(file_path_1, mirror_path_1, location_1, location_2)
                 else:
                     if not isinstance(file[0], Folder):
-                        self._modify(file_path_2, mirror_path, location_2, location_1)
+                        self._modify(file_path_2, mirror_path_2, location_2, location_1)
             elif file[1] == "deleted":
                 if file[2] == 1:
                     if isinstance(file[0], Folder):
@@ -190,8 +217,6 @@ class Sync:
             if file[1] not in ["added"] and isinstance(file[0], Folder):
                 self.recursive_balance_differences(file, location_1, location_2)
 
-    # sa inceapa sincronizarea daca se modificia data de modificare la fiecare prima locatie
-
     def _add(self, source, destination, location_1, location_2, file):
         object_of_type = file[0]
         if isinstance(location_1, FtpLocation) and isinstance(location_2, FtpLocation):
@@ -203,7 +228,7 @@ class Sync:
         # source
         elif isinstance(location_1, FtpLocation) and not isinstance(location_2, FtpLocation):
             if isinstance(object_of_type, Folder):
-                FtpLocation.copy_ftp_folder_to(location_1.connection, source, destination)
+                FtpLocation.copy_ftp_folder_to_folder(location_1.connection, source, destination)
             else:
                 FtpLocation.copy_ftp_file_to(location_1.connection, source, destination)
         elif not isinstance(location_1, FtpLocation) and isinstance(location_2, FtpLocation):
@@ -214,7 +239,6 @@ class Sync:
         else:
             if isinstance(object_of_type, Folder):
                 Folder.copy_folder(source, destination)
-                # Sync.recursive_balance_differences(self, file) nu are rost sa mai merg ca deja am copiat folderul
             else:
                 Folder.copy_file(source, destination)
 
@@ -229,10 +253,14 @@ class Sync:
             Folder.copy_file(source, destination)
 
     def location_walk(self, current_path, location_number, location_current_files, location_1_2_files, real_path,
-                      type_current_location="folder", relative_path=""):
+                      type_current_location=None, connection=None, relative_path=""):
         try:
             if type_current_location == "ftp":
-                list_of_files = self.connection.nlst()
+                path_ftp_folder = current_path
+                print(f"current path {current_path}")
+                current_directory = connection.pwd()
+                list_of_files = connection.nlst(path_ftp_folder)
+                connection.cwd(current_directory)
             else:
                 list_of_files = os.listdir(current_path)
 
@@ -244,24 +272,32 @@ class Sync:
                         key = file
 
                     if file not in list_of_files:
-                        location_current_files[3][key] = [location_1_2_files[3][file][0], "deleted", location_number,
+                        location_current_files[3][key] = [location_1_2_files[3][key][0], "deleted", location_number,
                                                           {}]
 
             for file in list_of_files:
-                key = file
                 if type_current_location == "ftp":
-                    time_str = self.connection.voidcmd(f'MDTM {file}')[4:]
-                    data_modified = datetime.strptime(time_str[:14], '%Y%m%d%H%M%S')
+                    key = file.split("/")[-1]
+                else:
+                    key = file
+
+                if type_current_location == "ftp":
+                    time_str = connection.voidcmd(f'MDTM {file}')[4:]
+                    data_modified = datetime.strptime(time_str.strip()[:14], '%Y%m%d%H%M%S')
+                    data_modified += timedelta(hours=2)
                 else:
                     data_modified = datetime.fromtimestamp(os.path.getmtime(os.path.join(current_path, file)))
-                relative_ = os.path.join(relative_path, file)
-                object_of_type = object_specific_type(file, current_path, data_modified, real_path,
-                                                      type_current_location, relative_)
+
+                relative_ = os.path.join(relative_path, key)
+                object_of_type = object_specific_type(key, current_path, data_modified, real_path,
+                                                      type_current_location, relative_, connection,
+                                                      type_current_location)
                 location_1_2_key_exists = False
-                if len(location_1_2_files) < 4 or file not in location_1_2_files[3].keys():
+                if len(location_1_2_files) < 4 or key not in location_1_2_files[3].keys():
                     location_current_files[3][key] = [object_of_type, "added", location_number, {}]
                 elif location_1_2_files[3][key][0].data_modified != data_modified:
                     location_current_files[3][key] = [object_of_type, "modified", location_number, {}]
+                    print(data_modified)
                     location_1_2_key_exists = True
                 elif location_1_2_files[3][key][0].data_modified == data_modified:
                     location_current_files[3][key] = [location_1_2_files[3][key][0], "unchanged", 57, {}]
@@ -273,18 +309,23 @@ class Sync:
                     location_1_2 = []
 
                 if isinstance(object_of_type, Folder):
-                    self.location_walk(os.path.join(current_path, file), location_number,
+                    if type_current_location == "ftp":
+                        current_path_next = current_path + key + "/"
+                    else:
+                        current_path_next = os.path.join(current_path, file)
+                    self.location_walk(current_path_next, location_number,
                                        location_current_files[3][key],
-                                       location_1_2, os.path.join(real_path, file), "folder", relative_)
+                                       location_1_2, os.path.join(real_path, key), type_current_location, connection,
+                                       relative_)
 
         except (OSError, zipfile.BadZipFile) as e:
-            print(f"Error at checking the differences in {type(location_current_files[0])} {current_path}",
+            print(f"1 Error at checking the differences in {type(location_current_files[0])} {current_path}",
                   type(e), str(e))
             sys.exit(1)
         except ftplib.all_errors as e:
-            print(f"Error at checking the differences in {type(location_current_files[0])} {current_path}",
+            print(f"2 Error at checking the differences in {type(location_current_files[0])} {current_path}",
                   type(e), str(e))
-            self.connection.quit()
+            connection.quit()
             sys.exit(1)
 
     def compare_location_current_files(self, location_1_2_files, location_1_files, location_2_files,
@@ -325,7 +366,6 @@ class Sync:
             else:
                 next_2 = location_2_files[3][key]
 
-            print(f"key {key} file {file} next_1_2 {next_1_2} next_1 {next_1} next_2 {next_2}")
             if isinstance(file[0], Folder) and file[1] != "deleted":
                 self.compare_location_current_files(next_1_2, next_1, next_2,
                                                     new_location_1_2_files[3][key])
@@ -334,31 +374,31 @@ class Sync:
         if isinstance(self.location_1, Folder):
             self.location_walk(self.location_1.get_abs_real_path(), 1, location_current_files_1,
                                self.location_1_2_files,
-                               self.location_1.get_abs_real_path())
+                               self.location_1.get_abs_real_path(), "folder", self.connection_1, "")
         elif isinstance(self.location_1, Zip):
             temp_dir = Zip.extract_zip_to_temp(self.location_1.get_location())
             self.location_1.set_temporary_abs_path(temp_dir)
             # self.location_1.set_name(os.path.basename(temp_dir))
             self.location_walk(temp_dir, 1, location_current_files_1, self.location_1_2_files,
-                               self.location_1.get_temporary_abs_path(), "zip")
+                               self.location_1.get_temporary_abs_path(), "zip", relative_path="")
         elif isinstance(self.location_1, FtpLocation):
             self.location_walk(self.location_1.get_abs_real_path(), 1, location_current_files_1,
                                self.location_1_2_files,
-                               self.location_1.get_abs_real_path(), "ftp")
+                               self.location_1.get_abs_real_path(), "ftp", self.connection_1, "")
 
         if isinstance(self.location_2, Folder):
             self.location_walk(self.location_2.get_abs_real_path(), 2, location_current_files_2,
                                self.location_1_2_files,
-                               self.location_2.get_abs_real_path())
+                               self.location_2.get_abs_real_path(), "folder", relative_path="")
         elif isinstance(self.location_2, Zip):
             temp_dir = Zip.extract_zip_to_temp(self.location_2.get_location())
             self.location_2.set_temporary_abs_path(temp_dir)
             self.location_walk(temp_dir, 2, location_current_files_2, self.location_1_2_files,
-                               self.location_2.get_temporary_abs_path(), "zip")
+                               self.location_2.get_temporary_abs_path(), "zip", relative_path="")
         elif isinstance(self.location_2, FtpLocation):
             self.location_walk(self.location_2.get_abs_real_path(), 2, location_current_files_2,
                                self.location_1_2_files,
-                               self.location_2.get_abs_real_path(), "ftp")
+                               self.location_2.get_abs_real_path(), "ftp", self.connection_2, "")
 
     def set_new_state(self):
         pass
