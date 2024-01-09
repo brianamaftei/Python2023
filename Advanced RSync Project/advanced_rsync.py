@@ -263,17 +263,20 @@ class Sync:
             if isinstance(object_of_type, Folder):
                 FtpLocation.copy_folder_from_ftp_to_ftp(location_1.connection, location_2.connection, source,
                                                         destination)
+                logging.info(f"Copied ftp folder from {source} to {source}")
             else:
                 FtpLocation.copy_file_from_ftp_to_ftp(location_1.connection, location_2.connection, source, "copied")
         # source
         elif isinstance(location_1, FtpLocation) and not isinstance(location_2, FtpLocation):
             if isinstance(object_of_type, Folder):
                 FtpLocation.copy_ftp_folder_to_folder(location_1.connection, source, destination)
+                logging.info(f"Copied ftp folder from {source} to {destination}")
             else:
                 FtpLocation.copy_ftp_file_to(location_1.connection, source, destination, "copied")
         elif not isinstance(location_1, FtpLocation) and isinstance(location_2, FtpLocation):
             if isinstance(object_of_type, Folder):
                 FtpLocation.copy_folder_to_ftp(location_2.connection, source, destination)
+                logging.info(f"Copied local folder from {source} to ftp {destination}")
             else:
                 FtpLocation.copy_file_to_ftp(location_2.connection, source, destination, "copied")
         else:
@@ -477,7 +480,8 @@ class Sync:
 
     @classmethod
     def modified_comparison(cls, location_1, location_2, location_1_2):
-        """Returns the modified file/folder or the unchanged file/folder"""
+        """Returns the modified file/folder or the unchanged file/folder
+        """
         old_data = location_1_2[0].data_modified
         location_1_data = location_1[0].data_modified
         location_2_data = location_2[0].data_modified
@@ -497,7 +501,7 @@ class Sync:
         if location_1_data < location_2_data:
             return [location_2[0], "modified", location_2[2], location_2[3]]
 
-        print("Modify AICI NU TREBUIE SA AJUNGA")
+        print("Modify")
 
     @classmethod
     def added_comparison(cls, location_1, location_2):
@@ -514,7 +518,7 @@ class Sync:
         if location_1_data < location_2_data:
             return [location_2[0], "modified", location_2[2], {}]
 
-        logging.warning("Added AICI NU TREBUIE SA AJUNGA")
+        logging.warning("Added")
 
     def remove_deleted_elements(self, location_1_2_files):
         """Removes the deleted files/folders from the dictionary"""

@@ -228,7 +228,6 @@ class FtpLocation:
 
                     timestamp = int(time.mktime(data_modified.timetuple()))
                     os.utime(dest_path, (timestamp, timestamp))
-                    logging.info(f"File {source_path} copied to {dest_path}")
 
         except ftplib.all_errors as e:
             logging.error(f"FTP copy ftp folder to error: {e} {source} {destination}")
@@ -330,7 +329,6 @@ class FtpLocation:
                         connection_to.storbinary(f"STOR {dest_path}", buffer)
                         if mod_time:
                             cls.set_mod_time_on_ftp_from_ftp(connection_to, dest_path, mod_time)
-                    logging.info(f"File {source_path} copied from ftp to ftp")
         except ftplib.all_errors as e:
             logging.error(f"FTP copy folder from ftp to ftp error: {e}")
             sys.exit(1)
@@ -351,7 +349,6 @@ class FtpLocation:
                     cls.delete_ftp_folder(connection, source_path)
                 else:
                     connection.delete(source_path)
-                    logging.info(f"File {source_path} deleted")
 
             connection.rmd(source)
         except ftplib.all_errors as e:
@@ -365,6 +362,7 @@ class FtpLocation:
         :param source: path of the folder to delete"""
         try:
             FtpLocation.delete_ftp_content_folder(connection, source)
+            logging.info(f"Folder ftp {source} deleted")
         except ftplib.all_errors as e:
             logging.error(f"FTP delete ftp folder error 2: {e} {source}")
             sys.exit(1)
