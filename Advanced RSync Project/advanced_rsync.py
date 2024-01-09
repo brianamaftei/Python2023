@@ -116,6 +116,64 @@ class Sync:
         else:
             self.connection_2 = None
 
+    def are_changes(self, differences_dictionary):
+        """Returns true if there are changes and false if there are not
+        :param differences_dictionary: the dictionary that contains the differences between the two locations"""
+        for key in differences_dictionary[3].keys():
+            file = differences_dictionary[3][key]
+            if file[1] != "unchanged":
+                if not isinstance(file[0], Folder):
+                    return True
+                else:
+                    if self.are_changes(file):
+                        return True
+        return False
+
+    def print_changes(self, differences_dictionary):
+        """Prints the differences that will be made
+        :param differences_dictionary: the dictionary that contains the differences between the two locations
+        """
+        for key in differences_dictionary[3].keys():
+            file = differences_dictionary[3][key]
+            if file[1] != "unchanged":
+                relative_path = file[0].get_relative_path()
+                if file[2] == 1:
+                    mirror_path = self.mirror_path(relative_path, 1, self.location_2)
+                else:
+                    mirror_path = self.mirror_path(relative_path, 2, self.location_1)
+
+                if isinstance(file[0], Folder):
+                    if file[1] in ["added", "deleted"]:
+                        print(f"Folder {key} will be {file[1]}: {mirror_path}")
+                    else:
+                        self.print_changes(file)
+
+                elif not isinstance(file[0], Folder) and file[1] != "unchanged":
+                    print(f"File {key} will be {file[1]}: {mirror_path}")
+
+    def accept_changes_permission(self, differences_dictionary):
+        """Asks the user if he wants to accept the changes or not
+        :param differences_dictionary: the dictionary that contains the differences between the two locations"""
+
+        changes = self.are_changes(differences_dictionary)
+
+        if not changes:
+            print("No changes were made")
+            return
+        else:
+            print("Changes that will be made:")
+            self.print_changes(differences_dictionary)
+
+        print("Do you want to accept the changes? (yes/no)")
+        while True:
+            result = input()
+            if result == "no":
+                raise KeyboardInterrupt
+            elif result == "yes":
+                return
+            else:
+                print("Invalid input. Please try again!")
+
     def start(self):
         """Starts the synchronization and also keeps the synchronization until the user wants to quit or sync continuously
         Important attributes:
@@ -138,17 +196,19 @@ class Sync:
                 self.compare_location_current_files(self.location_1_2_files, location_current_files_1,
                                                     location_current_files_2, new_location_1_2_files)
 
-                if new_location_1_2_files == new_location_1_2_files:
-                    continue
+                self.accept_changes_permission(new_location_1_2_files)
 
                 self.location_1_2_files.clear()
                 self.location_1_2_files = new_location_1_2_files.copy()
+                print()
                 # print("Location 1")
                 # print_dictionary(location_current_files_1[3])
                 # print("Location 2")
                 # print_dictionary(location_current_files_2[3])
                 # print("Location 1 2")
                 # print_dictionary(self.location_1_2_files[3])
+                print()
+                print("Information about the synchronization:")
 
                 self.recursive_balance_differences(self.location_1_2_files, self.location_1, self.location_2)
 
@@ -162,10 +222,10 @@ class Sync:
                     Zip.compress_folder_into_zip(self.location_2.get_temporary_abs_path(),
                                                  self.location_2.get_location())
 
-                # print("Press enter to continue or quit to exit")
-                # result = input()
-                # if result == "quit":
-                #     break
+                print("Press enter to continue or quit to exit")
+                result = input()
+                if result == "quit":
+                    break
 
             except KeyboardInterrupt:
                 print("KeyboardInterrupt")
@@ -411,6 +471,7 @@ class Sync:
                     if location_1_files[3][key][1] == "deleted" or location_2_files[3][key][1] == "deleted":
                         new_location_1_2_files[3][key] = Sync.deleted_comparison(location_1_files[3][key],
                                                                                  location_2_files[3][key])
+
                     elif location_1_files[3][key][1] == "modified" or location_2_files[3][key][1] == "modified":
                         new_location_1_2_files[3][key] = Sync.modified_comparison(location_1_files[3][key],
                                                                                   location_2_files[3][key],

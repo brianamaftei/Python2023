@@ -73,7 +73,7 @@ class Zip(File):
                         extracted_path = os.path.join(temp_dir, file_info.filename)
                         date_modified = time.mktime(file_info.date_time + (0, 0, -1))
                         os.utime(extracted_path, (date_modified, date_modified))
-            print(f"Zip {zip_path} extracted to temporary folder {temp_dir}")
+            # print(f"Zip {zip_path} extracted to temporary folder {temp_dir}")
             return temp_dir
         except zipfile.BadZipFile as e:
             print(type(e), str(e))
@@ -111,7 +111,7 @@ class Zip(File):
                         zip_info.date_time = file_mtime[:6]
                         zip_file.write(file_path, os.path.relpath(file_path, temp_dir))
 
-            logging.info(f"Folder {temp_dir} compressed into {destination}")
+            # logging.info(f"Folder {temp_dir} compressed into {destination}")
             cls.delete_temp_dir(temp_dir)
 
         except zipfile.BadZipFile as e:

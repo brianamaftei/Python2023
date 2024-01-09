@@ -124,7 +124,6 @@ class FtpLocation:
         try:
             gmt_time = mod_time.strftime("%Y%m%d%H%M%S")
             connection.sendcmd(f"MFMT {gmt_time} {path}")
-            logging.info(f"Set modification time for {path} to {gmt_time}")
         except ftplib.all_errors as e:
             logging.warning(f"Unable to set modification time on FTP for {path}: {e}")
 
@@ -146,7 +145,7 @@ class FtpLocation:
                 source_path = os.path.join(source, name)
                 dest_path = os.path.join(destination, name)
                 dest_path = dest_path.replace("\\", "/")
-                logging.info(f"Source path: {source_path} Dest path: {dest_path}")
+                # logging.info(f"Source path: {source_path} Dest path: {dest_path}")
                 if os.path.isdir(source_path):
                     cls.copy_folder_to_ftp(connection, source_path, dest_path)
                 else:
@@ -168,7 +167,7 @@ class FtpLocation:
         gmt_time = datetime.fromtimestamp(mod_time, timezone.utc).strftime("%Y%m%d%H%M%S")
         try:
             connection.sendcmd(f'MFMT {gmt_time} {path}')
-            logging.info(f"Set modification time for {path} to {gmt_time}")
+            # logging.info(f"Set modification time for {path} to {gmt_time}")
         except ftplib.all_errors as e:
             logging.warning(f"Unable to set modification time on FTP for {path}: {e}")
 

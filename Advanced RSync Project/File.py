@@ -3,6 +3,7 @@ import os
 
 class File:
     """Class that represents a file"""
+
     def __init__(self, name, data_modified, real_parent, temporary_parent=None, type_parent=None, relative_path=None):
         self.name = name
         if "." not in self.name:
@@ -23,6 +24,7 @@ class File:
     def set_name(self, name):
         """Sets the name of the file"""
         self.name = name
+
     def get_name(self):
         """Returns the name of the file"""
         return self.name
