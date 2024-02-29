@@ -18,7 +18,7 @@ The script runs continuously and keeps the two locations synchronized in the fol
 
 ### Initial Synchronization
 
-Upon initial startup, synchronization occurs according to the following algorithm:
+Upon initial startup, synchronization occurs as follows:
 
 - If a file exists only in one location, it is copied to the other location.
 - If the same file exists in both locations but there are differences, the most recent file (based on the last modified time) from one location is copied to the other.
